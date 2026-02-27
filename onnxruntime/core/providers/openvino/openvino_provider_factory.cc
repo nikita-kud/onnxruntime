@@ -32,9 +32,7 @@ void ParseConfigOptions(ProviderInfo& pi) {
   pi.so_stop_share_ep_contexts = pi.config_options->GetConfigOrDefault(kOrtSessionOptionStopShareEpContexts, "0") == "1";
 
   if (pi.so_share_ep_contexts) {
-    ov::AnyMap map;
-    map["NPU_COMPILATION_MODE_PARAMS"] = "enable-wd-blockarg-input=true compute-layers-with-higher-precision=Sqrt,Power,ReduceSum";
-    pi.load_config["NPU"] = std::move(map);
+    pi.load_config["NPU"]["NPU_COMPILATION_MODE_PARAMS"] = "enable-wd-blockarg-input=true compute-layers-with-higher-precision=Sqrt,Power,ReduceSum";
   }
 }
 
@@ -369,6 +367,10 @@ static void ParseProviderInfo(const ProviderOptions& provider_options,
     pi.disable_dynamic_shapes = ParseBooleanOption(provider_options, "disable_dynamic_shapes");
   } catch (std::string msg) {
     ORT_THROW(msg);
+  }
+
+  if (provider_options.contains("weights_model_path")) {
+    pi.weights_model_path = provider_options.at("weights_model_path");
   }
 
   // Should likely account for meta devices as well, but for now keep the current behavior.

@@ -874,6 +874,12 @@ select from 'TF8', 'TF16', 'UINT8', 'FLOAT', 'ITENSOR'. \n)");
         ov_options[key] = value;
       } else if (key == "layout") {
         ov_options[key] = value;
+      } else if (key == "weights_model_path") {
+        // Path to the original ONNX model for providing weights to weightless compiled models
+        if (value.empty()) {
+          ORT_THROW("[ERROR] [OpenVINO] Please provide a valid path for 'weights_model_path'.\n");
+        }
+        ov_options[key] = value;
       } else {
         ORT_THROW(
             "[ERROR] [OpenVINO] wrong key type entered. Choose from the following runtime key options that are available for OpenVINO."

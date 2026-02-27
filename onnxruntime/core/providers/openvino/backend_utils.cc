@@ -48,31 +48,31 @@ CreateOVModel(std::string&& model,
   try {
     auto ov_model = OVCore::Get()->ReadModel(std::move(model), session_context.onnx_model_path_name.string());
 
-    if (!session_context.reshape.empty()) {
-      LOGS_DEFAULT(INFO) << log_tag << "Reshaping the ov tensor to specified shape";
-      ov_model->reshape(session_context.reshape);
-    }
+    //if (!session_context.reshape.empty()) {
+    //  LOGS_DEFAULT(INFO) << log_tag << "Reshaping the ov tensor to specified shape";
+    //  ov_model->reshape(session_context.reshape);
+    //}
 
-    if (!session_context.layout.empty()) {
-      LOGS_DEFAULT(INFO) << log_tag << "Setting the ov tensor layout to specified layout";
-      ov_model = Set_Layout(ov_model, session_context.layout);
-    }
+    //if (!session_context.layout.empty()) {
+    //  LOGS_DEFAULT(INFO) << log_tag << "Setting the ov tensor layout to specified layout";
+    //  ov_model = Set_Layout(ov_model, session_context.layout);
+    //}
     // Check for Constant Folding
-    if ((session_context.device_type != "NPU") && !session_context.is_wholly_supported_graph) {
-      ov::pass::ConstantFolding pass_const_obj;
-      pass_const_obj.run_on_model(ov_model);
-      auto& results = const_cast<ov::ResultVector&>(ov_model.get()->get_results());
-      size_t index = results.size() - 1;
+    //if ((session_context.device_type != "NPU") && !session_context.is_wholly_supported_graph) {
+    //  ov::pass::ConstantFolding pass_const_obj;
+    //  pass_const_obj.run_on_model(ov_model);
+    //  auto& results = const_cast<ov::ResultVector&>(ov_model.get()->get_results());
+    //  size_t index = results.size() - 1;
 
-      for (auto it = results.rbegin(); it != results.rend(); ++it) {
-        if (auto const_node =
-                std::dynamic_pointer_cast<ov::op::v0::Constant>((*it)->input_value(0).get_node_shared_ptr())) {
-          const_outputs_map[(*it)->get_friendly_name()] = const_node;
-          results.erase(results.begin() + index);
-        }
-        --index;
-      }
-    }
+    //  for (auto it = results.rbegin(); it != results.rend(); ++it) {
+    //    if (auto const_node =
+    //            std::dynamic_pointer_cast<ov::op::v0::Constant>((*it)->input_value(0).get_node_shared_ptr())) {
+    //      const_outputs_map[(*it)->get_friendly_name()] = const_node;
+    //      results.erase(results.begin() + index);
+    //    }
+    //    --index;
+    //  }
+    //}
 #ifndef NDEBUG
     if (IsDebugEnabled()) {
       std::string name = ov_model->get_friendly_name();
