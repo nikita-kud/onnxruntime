@@ -66,8 +66,43 @@ BasicBackend::BasicBackend(std::unique_ptr<ONNX_NAMESPACE::ModelProto>& model_pr
                                                                    model_file_path(),
                                                                    session_context_);
       } else {
-        // If the blob is held in an EPContext node, then skip FE+Compile
-        // and directly move on to creating a backend with the executable blob
+        // If a weights model path was provided, load and serialize the ONNX model
+        // identically to the compilation path (model_proto->SerializeAsString()),
+        // then pass it as WEIGHTS_PATH so the NPU plugin can resolve weight constants
+        // during weightless graph initialization.
+        if (!session_context_.weights_model_path.empty()) {
+          std::ifstream weights_onnx(session_context_.weights_model_path,
+                                     std::ios::binary);
+          ORT_ENFORCE(weights_onnx.is_open(),
+                      log_tag + "Failed to open weights model file: " +
+                          session_context_.weights_model_path);
+
+          std::string file_content((std::istreambuf_iterator<char>(weights_onnx)),
+                                   std::istreambuf_iterator<char>());
+
+          auto weights_proto = ONNX_NAMESPACE::ModelProto::Create();
+          ORT_ENFORCE(weights_proto->ParseFromString(file_content),
+                      log_tag + "Failed to parse weights model file: " +
+                          session_context_.weights_model_path);
+
+          std::string serialized_model = weights_proto->SerializeAsString();
+          // const std::string dump_path = "debug_model_dump_infer.onnx";
+          // std::ofstream dump_file(dump_path, std::ios::binary | std::ios::trunc);
+          // if (dump_file.is_open()) {
+          //   dump_file.write(serialized_model.data(), static_cast<std::streamsize>(serialized_model.size()));
+          //   dump_file.close();
+          //   LOGS_DEFAULT(INFO) << log_tag << "Model dumped to: " << dump_path;
+          // } else {
+          //   LOGS_DEFAULT(WARNING) << log_tag << "Failed to dump model to: " << dump_path;
+          // }
+
+          auto ov_model = OVCore::Get()->ReadModel(std::move(serialized_model), session_context_.weights_model_path);
+          device_config[ov::hint::model.name()] = std::move(ov_model);
+
+          LOGS_DEFAULT(INFO) << log_tag << "Injected Model ptr from: "
+                             << session_context_.weights_model_path;
+        }
+
         exe_network_ = OVCore::Get()->ImportModel(*model_stream,
                                                   hw_target,
                                                   device_config,
@@ -80,6 +115,66 @@ BasicBackend::BasicBackend(std::unique_ptr<ONNX_NAMESPACE::ModelProto>& model_pr
   } else {
     std::shared_ptr<const onnxruntime::openvino_ep::OVNetwork> ov_model;
     std::string model = model_proto->SerializeAsString();
+
+    // During compilation, save the transformed subgraph proto so it can be
+    // reused at import time via weights_model_path.
+    if (!session_context_.weights_model_path.empty()) {
+      const std::filesystem::path weights_path(session_context_.weights_model_path);
+      const auto transformed_path = weights_path.parent_path() /
+                                    (weights_path.stem().string() + "_ov_subgraph.onnx");
+
+      // Re-serialize the model proto ensuring all initializer data is inlined,
+      // not stored as external memory pointers which become invalid after this process exits.
+      auto model_copy = ONNX_NAMESPACE::ModelProto::Create();
+      model_copy->ParseFromString(model);
+
+      // Clear any external data references that point to in-process memory
+      auto* graph_proto = model_copy->mutable_graph();
+      auto* initializers = graph_proto->mutable_initializer();
+      for (int i = 0; i < initializers->size(); ++i) {
+        auto& init = initializers->at(i);
+        if (init.data_location() == ONNX_NAMESPACE::TensorProto_DataLocation::TensorProto_DataLocation_EXTERNAL) {
+          // Read the data from the in-memory pointer before it goes away
+          std::string location;
+          size_t offset = 0;
+          size_t length = 0;
+          auto* ext_data = init.mutable_external_data();
+          for (int j = 0; j < ext_data->size(); ++j) {
+            auto& entry = ext_data->at(j);
+            if (*entry.mutable_key() == "location")
+              location = *entry.mutable_value();
+            else if (*entry.mutable_key() == "offset")
+              offset = std::stoull(*entry.mutable_value());
+            else if (*entry.mutable_key() == "length")
+              length = std::stoull(*entry.mutable_value());
+          }
+          if (location == "*/_ORT_MEM_ADDR_/*" && length > 0) {
+            // Copy the data inline from the live memory pointer
+            const char* data_ptr = reinterpret_cast<const char*>(offset);
+            init.mutable_raw_data()->assign(data_ptr, length);
+            // Remove external data entries by clearing the repeated field
+            while (init.mutable_external_data()->size() > 0) {
+              init.mutable_external_data()->Clear();
+            }
+            init.set_data_location(ONNX_NAMESPACE::TensorProto_DataLocation::TensorProto_DataLocation_DEFAULT);
+          }
+        }
+      }
+
+      std::string inlined_model = model_copy->SerializeAsString();
+      std::ofstream out(transformed_path, std::ios::binary | std::ios::trunc);
+      if (out.is_open()) {
+        out.write(inlined_model.data(), static_cast<std::streamsize>(inlined_model.size()));
+        out.close();
+        LOGS_DEFAULT(INFO) << log_tag << "Saved transformed subgraph (with inlined weights) to: "
+                           << transformed_path.string();
+      }
+    }
+
+    if (!subgraph_context.has_dynamic_input_shape) {
+      model_proto.reset();
+    }
+
     if (!subgraph_context.has_dynamic_input_shape) {
       model_proto.reset();
     }

@@ -569,10 +569,10 @@ BackendManager::GetModelProtoFromFusedNode(const onnxruntime::Node& fused_node,
 
         // Only set in-memory external_data fields if the data is in memory
         if (src_init->has_raw_data()) {
-          LOGS(logger, VERBOSE) << "In-memory initializer RAW: "
-                                << src_init->name()
-                                << ", data_type: " << src_init->data_type()
-                                << ", raw_data size: " << src_init->raw_data().size();
+          //LOGS(logger, VERBOSE) << "In-memory initializer RAW: "
+          //                      << src_init->name()
+          //                      << ", data_type: " << src_init->data_type()
+          //                      << ", raw_data size: " << src_init->raw_data().size();
           if (src_init->raw_data().size() > 0) {
             SetExternalDataFields(proto_init, src_init->raw_data().data(), src_init->raw_data().size());
           } else {
@@ -588,11 +588,11 @@ BackendManager::GetModelProtoFromFusedNode(const onnxruntime::Node& fused_node,
           const size_t offset = it_ext->second.first;
           const size_t length = it_ext->second.second;
 
-          LOGS(logger, VERBOSE) << "In-memory initializer EXT: " << src_init->name() << ", size: " << length;
+          //LOGS(logger, VERBOSE) << "In-memory initializer EXT: " << src_init->name() << ", size: " << length;
 
           SetExternalDataFields(proto_init, (const void*)offset, length);
         } else {
-          LOGS(logger, VERBOSE) << "File-based initializer: " << src_init->name() << ", data_type: " << src_init->data_type();
+          //LOGS(logger, VERBOSE) << "File-based initializer: " << src_init->name() << ", data_type: " << src_init->data_type();
         }
       }
     }

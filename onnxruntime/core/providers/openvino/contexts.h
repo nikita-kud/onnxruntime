@@ -57,6 +57,8 @@ struct ProviderInfo {
                                            // static shape at runtime and execute.
   bool enable_qdq_optimizer{false};        // Enables QDQ pruning for efficient inference latency with NPU
   bool enable_causallm{false};             // Enables Causal LM Compilation for ORT GenAI OVEP Pass
+  std::string weights_model_path{""};      // [weights_model_path]: Path to the original ONNX model
+                                           // providing weights for weightless compiled models (NPU).
   bool so_context_enable{false};           // ORT session option
   bool so_disable_cpu_ep_fallback{false};  // ORT session option
   bool so_context_embed_mode{false};       // ORT session option
@@ -66,7 +68,7 @@ struct ProviderInfo {
   const ConfigOptions* config_options{NULL};
   const std::unordered_set<std::string> valid_provider_keys = {"device_type", "device_id", "device_luid", "cache_dir", "precision",
                                                                "load_config", "context", "num_of_threads", "model_priority", "num_streams", "enable_opencl_throttling", "enable_qdq_optimizer",
-                                                               "enable_causallm", "disable_dynamic_shapes", "reshape_input", "layout"};
+                                                               "enable_causallm", "disable_dynamic_shapes", "reshape_input", "layout", "weights_model_path"};
 };
 
 struct RuntimeConfig {

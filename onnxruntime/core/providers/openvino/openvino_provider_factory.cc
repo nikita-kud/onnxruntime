@@ -373,6 +373,10 @@ static void ParseProviderInfo(const ProviderOptions& provider_options,
     ORT_THROW(msg);
   }
 
+  if (provider_options.contains("weights_model_path")) {
+    pi.weights_model_path = provider_options.at("weights_model_path");
+  }
+
   // Should likely account for meta devices as well, but for now keep the current behavior.
   bool target_devices_support_dynamic_shapes =
       pi.device_type.find("GPU") != std::string::npos ||
