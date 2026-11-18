@@ -3,6 +3,7 @@
 
 // onnxruntime dependencies
 #include <core/session/onnxruntime_c_api.h>
+#include <core/session/onnxruntime_session_options_config_keys.h>
 #include <chrono>
 #include <iostream>
 #include <random>
@@ -186,8 +187,19 @@ Ort::Status CompileEpContextModel(Ort::Env& env, const perftest::PerformanceTest
     }
   }
 
+  const auto& session_config_entries = test_config.run_config.session_config_entries;
+  const auto weightless_option = session_config_entries.find(kOrtSessionOptionEpEnableWeightless);
+  for (const auto& [key, value] : session_config_entries) {
+    if (key != kOrtSessionOptionEpEnableWeightless) {
+      session_options.AddConfigEntry(key.c_str(), value.c_str());
+    }
+  }
+
   Ort::ModelCompilationOptions model_compile_options(env, session_options);
   model_compile_options.SetEpContextEmbedMode(test_config.run_config.compile_binary_embed);
+  if (weightless_option != session_config_entries.end()) {
+    model_compile_options.SetWeightlessEnabled(weightless_option->second == "1");
+  }
   model_compile_options.SetInputModelPath(test_config.model_info.model_file_path.c_str());
   model_compile_options.SetOutputModelPath(output_ctx_model_path.c_str());
 
